@@ -1,10 +1,9 @@
-import os,sys,json
+
+import os, sys, json
 import click
 import random
-import requests,time
+import requests, time
 from contextlib import closing
-
-
 
 '''
 Input:
@@ -20,7 +19,7 @@ Return:
 	-download模式:
 		--downed_list: 成功下载的歌曲名列表
 '''
-savepath = r'D:\sings'
+savepath = r'D:\songs'
 
 
 class qq():
@@ -38,50 +37,51 @@ class qq():
         self.download_format_url = "http://dl.stream.qqmusic.qq.com/{}{}.mp3?vkey={}&guid={}&fromtag=1"
         self.search_results = {}
 
-
-
     '''外部调用'''
 
-    def get(self, mode='search', **kwargs):
+    def get_song(self, mode='search', **kwargs):
         # print(kwargs)
         if mode == 'search':
             songname = kwargs.get('songname')
-            self.search_results = self.__searchBySongname(songname)          #调用搜索歌曲方法
+            self.search_results = self.__searchBySongname(songname)  # 调用搜索歌曲方法
             # print(self.search_results)    #打印搜索结果
-            return self.search_results       #返回搜索结果
+            return self.search_results  # 返回搜索结果
         elif mode == 'download':
-            # print(kwargs)        #打印Kwargs数据
+            kwargs        #打印Kwargs数据
             need_down_list = kwargs.get('need_down_list')
             # singer = need_down_list.values()
+            # dict = need_down_list[0]
+            singer = need_down_list['singers']
             downed_list = []
+            # savepath = kwargs.get('savepath') if kwargs.get('savepath') is not None else 'D:\songs'
             savepath = kwargs.get('savepath') if kwargs.get('savepath') is not None else 'D:\songs'
+
             # print(kwargs.get(savepath))
             # print("文件存储在：%s" % savepath)
             if need_down_list is not None:
-                for download_item in need_down_list:
-                    songmid = download_item['song_id']
-                    media_mid = download_item['media_mid']
-                    download_name = download_item['song_name']
-                    guid = str(random.randrange(1000000000, 10000000000))
-                    params = {
-                        "guid": guid,
-                        "format": "json",
-                        "json": 3
-                    }
-                    fcg_res = requests.get(self.fcg_url, params=params, headers=self.ios_headers)
-                    vkey = fcg_res.json()['key']
-                    # for quality in ["A000","M800", "M500", "C400"]:
-                    for quality in [ "M500", "C400"]:
-                        download_url = self.download_format_url.format(quality, songmid, vkey, guid)
-                        res = self.__download(download_name, download_url, savepath)
-                        if res:
-                            break
-                        print('[qq-INFO]: %s-%s下载失败, 将尝试降低歌曲音质重新下载...' % (time.time(), quality))
+                songmid = need_down_list['song_id']
+                media_mid = need_down_list['media_mid']
+                download_name = need_down_list['song_name']
+                guid = str(random.randrange(1000000000, 10000000000))
+                params = {
+                    "guid": guid,
+                    "format": "json",
+                    "json": 3
+                }
+                fcg_res = requests.get(self.fcg_url, params=params, headers=self.ios_headers)
+                vkey = fcg_res.json()['key']
+                # for quality in ["A000","M800", "M500", "C400"]:
+                for quality in ["M500", "C400"]:
+                    download_url = self.download_format_url.format(quality, songmid, vkey, guid)
+                    res = self.__download(download_name, download_url, savepath)
                     if res:
-                        downed_list.append(download_name)
-                        print("%s歌曲%s%s品质 下载完成" % (song_name,quality))
-                        print("文件存储在：%s" % savepath)
-                        time.sleep(2)
+                        break
+                    print('[qq-INFO]: %s-%s下载失败, 将尝试降低歌曲音质重新下载...' % (time.time(), quality))
+                if res:
+                    downed_list.append(download_name)
+                    print("%s的歌曲: %s ,音乐品质：%s 下载完成" % (singer, song_name, quality))
+                    print("文件存储在：%s" % savepath)
+                    # time.sleep(2)
             return downed_list
         else:
             raise ValueError('mode in qq().get must be <search> or <download>...')
@@ -102,7 +102,7 @@ class qq():
                 if res.status_code == 200:
                     label = '[FileSize]:%0.2f MB' % (total_size / (1024 * 1024))
                     with click.progressbar(length=total_size, label=label) as progressbar:
-                        with open(os.path.join(savepath, savename), "wb") as f:             #wb以二进制格式打开一个文件只用于写入，文件存在则将元内容删除
+                        with open(os.path.join(savepath, savename), "wb") as f:  # wb以二进制格式打开一个文件只用于写入，文件存在则将元内容删除
                             for chunk in res.iter_content(chunk_size=1024):
                                 if chunk:
                                     f.write(chunk)
@@ -122,7 +122,7 @@ class qq():
             'p': 1,
             'n': 15
         }
-        res = requests.get(self.search_url, params=params, headers=self.headers)      #定义res变量接受请求的响应
+        res = requests.get(self.search_url, params=params, headers=self.headers)  # 定义res变量接受请求的响应
         # print(res.json())         #打印请求中的json信息
         results = []
         for song in res.json()['data']['song']['list']:
@@ -144,13 +144,17 @@ class qq():
 
         return results
 
+
 '''测试用'''
 if __name__ == '__main__':
     qq_downloader = qq()
+    flag = 'y'
+    while flag == 'y':
+        song_name = input("请输入你需要下载的歌曲： ")
+        # song_name = "稻香"
 
-    # song_name = input("请输入你需要下载的歌曲： ")
-    song_name = "稻香"
-
-    # print(song_name)
-    res = qq_downloader.get(mode='search', songname=song_name)
-    qq_downloader.get(mode='download', need_down_list=res[:1])
+        # print(song_name)
+        res = qq_downloader.get_song(mode='search', songname=song_name)
+        qq_downloader.get_song(mode='download', need_down_list=res[0],savepath=savepath)
+        print("------------------------------------------------")
+        flag = input("是否继续下载？（y/n）")
